@@ -1,6 +1,7 @@
 # Qoder 会话管理器
 
 解决Qoder IDE切换用户时会话丢失的问题，提供图形化界面管理会话。
+<img width="2000" height="1456" alt="7640411f-fb78-4123-97f5-14d358e3942a" src="https://github.com/user-attachments/assets/013d84a5-6833-4d10-9f7a-f671c8ee4284" />
 
 ## 功能特性
 

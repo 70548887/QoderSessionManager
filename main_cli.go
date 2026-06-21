@@ -52,6 +52,32 @@ func main() {
 		} else {
 			listBackups(manager, os.Args[2])
 		}
+	case "version", "--version", "-v":
+		fmt.Printf("Qoder Session Manager v%s\n", qoder.Version)
+		fmt.Printf("Build Time: %s\n", qoder.BuildTime)
+		fmt.Printf("Git Commit: %s\n", qoder.GitCommit)
+
+	case "update":
+		fmt.Printf("当前版本: v%s\n", qoder.Version)
+		fmt.Println("正在检查更新...")
+		release, hasUpdate, err := qoder.CheckUpdate()
+		if err != nil {
+			fmt.Printf("检查更新失败: %v\n", err)
+			return
+		}
+		if !hasUpdate {
+			fmt.Println("已是最新版本!")
+			return
+		}
+		fmt.Printf("发现新版本: %s\n", release.TagName)
+		fmt.Printf("更新说明: %s\n", release.Body)
+		fmt.Println("正在下载更新...")
+		if err := qoder.DoUpdate(release); err != nil {
+			fmt.Printf("升级失败: %v\n", err)
+			return
+		}
+		fmt.Println("升级成功! 请重新启动程序。")
+
 	default:
 		printUsage()
 	}
@@ -66,6 +92,8 @@ func printUsage() {
 	fmt.Println("  qoder-sm show <workspace-id>           - 显示工作区的会话详情")
 	fmt.Println("  qoder-sm export <workspace-id|all>     - 导出会话为可读格式")
 	fmt.Println("  qoder-sm list-backups [backup-dir]     - 列出所有备份")
+	fmt.Println("  qoder-sm version                       - 显示版本信息")
+	fmt.Println("  qoder-sm update                        - 检查并执行在线升级")
 	fmt.Println("\n示例:")
 	fmt.Println("  qoder-sm backup all")
 	fmt.Println("  qoder-sm restore ~/Documents/qoder-backup-20260524.json")

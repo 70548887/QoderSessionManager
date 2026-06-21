@@ -49,6 +49,9 @@ func (s *WebServer) Start() error {
 	http.HandleFunc("/api/restore", s.handleRestore)
 	http.HandleFunc("/api/export", s.handleExport)
 	http.HandleFunc("/api/backups", s.handleBackups)
+	http.HandleFunc("/api/version", s.handleVersion)
+	http.HandleFunc("/api/check-update", s.handleCheckUpdate)
+	http.HandleFunc("/api/do-update", s.handleDoUpdate)
 
 	addr := fmt.Sprintf("localhost:%d", s.port)
 	fmt.Printf("服务器已启动: http://%s\n", addr)
@@ -287,6 +290,53 @@ func openBrowser(url string) {
 
 func getDefaultBackupDir() string {
 	return GetDefaultBackupDir()
+}
+
+func (s *WebServer) handleVersion(w http.ResponseWriter, r *http.Request) {
+	info := map[string]string{
+		"version":   Version,
+		"buildTime": BuildTime,
+		"gitCommit": GitCommit,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(info)
+}
+
+func (s *WebServer) handleCheckUpdate(w http.ResponseWriter, r *http.Request) {
+	release, hasUpdate, err := CheckUpdate()
+	w.Header().Set("Content-Type", "application/json")
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"hasUpdate":      hasUpdate,
+		"currentVersion": Version,
+		"latestVersion":  release.TagName,
+		"releaseNotes":   release.Body,
+	})
+}
+
+func (s *WebServer) handleDoUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", 405)
+		return
+	}
+	release, hasUpdate, err := CheckUpdate()
+	if err != nil || !hasUpdate {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": "无可用更新"})
+		return
+	}
+	if err := DoUpdate(release); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "message": "升级成功，请重启程序"})
 }
 
 // findWebDir 查找web目录

@@ -166,7 +166,7 @@ func (a *App) BackupAll() BackupResult {
 	}
 
 	// 保存备份
-	backupDir := filepath.Join(os.Getenv("HOME"), "Documents", "qoder-backups")
+	backupDir := qoder.GetDefaultBackupDir()
 	os.MkdirAll(backupDir, 0755)
 	timestamp := time.Now().Format("20060102-150405")
 	backupPath := filepath.Join(backupDir, fmt.Sprintf("qoder-backup-all-%s.json", timestamp))
@@ -185,7 +185,7 @@ func (a *App) BackupAll() BackupResult {
 
 // GetBackups 获取备份列表
 func (a *App) GetBackups() []BackupInfo {
-	backupDir := filepath.Join(os.Getenv("HOME"), "Documents", "qoder-backups")
+	backupDir := qoder.GetDefaultBackupDir()
 	entries, err := os.ReadDir(backupDir)
 	if err != nil {
 		return []BackupInfo{}
@@ -196,7 +196,7 @@ func (a *App) GetBackups() []BackupInfo {
 		if entry.IsDir() {
 			continue
 		}
-		if !filepath.HasPrefix(entry.Name(), "qoder-backup") {
+		if !strings.HasPrefix(entry.Name(), "qoder-backup") {
 			continue
 		}
 
@@ -243,7 +243,7 @@ func (a *App) ExportSessions() string {
 		return "导出失败: " + err.Error()
 	}
 
-	backupDir := filepath.Join(os.Getenv("HOME"), "Documents", "qoder-backups")
+	backupDir := qoder.GetDefaultBackupDir()
 	timestamp := time.Now().Format("20060102-150405")
 	exportPath := filepath.Join(backupDir, fmt.Sprintf("qoder-export-%s.md", timestamp))
 
@@ -282,6 +282,6 @@ func (a *App) DeleteBackup(backupPath string) bool {
 
 // OpenBackupFolder 打开备份文件夹
 func (a *App) OpenBackupFolder() string {
-	backupDir := filepath.Join(os.Getenv("HOME"), "Documents", "qoder-backups")
+	backupDir := qoder.GetDefaultBackupDir()
 	return backupDir
 }

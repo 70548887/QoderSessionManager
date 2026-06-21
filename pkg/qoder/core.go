@@ -3,13 +3,16 @@ package qoder
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // QoderSessionManager 管理Qoder的会话
@@ -103,9 +106,8 @@ type SessionBackup struct {
 
 // NewQoderSessionManager 创建会话管理器
 func NewQoderSessionManager() *QoderSessionManager {
-	homeDir, _ := os.UserHomeDir()
 	return &QoderSessionManager{
-		basePath: filepath.Join(homeDir, "Library", "Application Support", "Qoder"),
+		basePath: GetQoderBasePath(),
 	}
 }
 
@@ -142,10 +144,32 @@ func (m *QoderSessionManager) ListWorkspaces() (map[string]string, error) {
 			Folder string `json:"folder"`
 		}
 		if err := json.Unmarshal(data, &ws); err == nil {
-			workspaces[workspaceID] = ws.Folder
+			workspaces[workspaceID] = decodeWorkspacePath(ws.Folder)
 		}
 	}
 	return workspaces, nil
+}
+
+// decodeWorkspacePath 将 URI 编码的工作区路径解码为可读路径
+func decodeWorkspacePath(raw string) string {
+	// 尝试解析为 URL（处理 file:///... 格式）
+	if u, err := url.Parse(raw); err == nil && u.Scheme == "file" {
+		path := u.Path
+		// 先对 path 做 URL 解码，处理 %3A 和中文编码
+		if decoded, err := url.PathUnescape(path); err == nil {
+			path = decoded
+		}
+		// Windows: /e:/... → e:/...
+		if len(path) > 0 && path[0] == '/' && len(path) > 2 && path[2] == ':' {
+			path = path[1:]
+		}
+		return path
+	}
+	// 非 file URI，尝试直接 URL 解码
+	if decoded, err := url.PathUnescape(raw); err == nil {
+		return decoded
+	}
+	return raw
 }
 
 // GetWorkspaceChatHistory 获取工作区的聊天历史
@@ -156,7 +180,7 @@ func (m *QoderSessionManager) GetWorkspaceChatHistory(workspaceID string) ([]Cha
 
 // getChatHistoryFromDB 从数据库获取聊天历史
 func (m *QoderSessionManager) getChatHistoryFromDB(dbPath, workspaceID string) ([]ChatHistory, error) {
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +213,7 @@ func (m *QoderSessionManager) GetWorkspaceChatViews(workspaceID string) (ChatVie
 func (m *QoderSessionManager) getChatViewsFromDB(dbPath string) (ChatViews, error) {
 	var views ChatViews
 
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return views, err
 	}
@@ -220,7 +244,7 @@ func (m *QoderSessionManager) GetWorkspaceChatTabs(workspaceID string) (ChatTabs
 func (m *QoderSessionManager) getChatTabsFromDB(dbPath string) (ChatTabs, error) {
 	var tabs ChatTabs
 
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return tabs, err
 	}
@@ -334,7 +358,7 @@ func (m *QoderSessionManager) restoreSingleBackup(backup SessionBackup) error {
 // restoreChatHistory 恢复聊天历史
 func (m *QoderSessionManager) restoreChatHistory(workspaceID string, history []ChatHistory) error {
 	dbPath := filepath.Join(m.basePath, "User", "globalStorage", "state.vscdb")
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return err
 	}
@@ -350,7 +374,7 @@ func (m *QoderSessionManager) restoreChatHistory(workspaceID string, history []C
 // restoreChatViews 恢复聊天视图
 func (m *QoderSessionManager) restoreChatViews(workspaceID string, views ChatViews) error {
 	dbPath := filepath.Join(m.basePath, "User", "workspaceStorage", workspaceID, "state.vscdb")
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return err
 	}
@@ -365,7 +389,7 @@ func (m *QoderSessionManager) restoreChatViews(workspaceID string, views ChatVie
 // restoreChatTabs 恢复聊天标签
 func (m *QoderSessionManager) restoreChatTabs(workspaceID string, tabs ChatTabs) error {
 	dbPath := filepath.Join(m.basePath, "User", "workspaceStorage", workspaceID, "state.vscdb")
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return err
 	}
@@ -381,6 +405,9 @@ func (m *QoderSessionManager) restoreChatTabs(workspaceID string, tabs ChatTabs)
 func (m *QoderSessionManager) ListBackups(backupDir string) ([]SessionBackup, error) {
 	entries, err := os.ReadDir(backupDir)
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return []SessionBackup{}, nil
+		}
 		return nil, err
 	}
 

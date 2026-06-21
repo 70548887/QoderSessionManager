@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"os/exec"
 	"time"
 
 	"qoder-sm/pkg/qoder"
@@ -36,5 +35,5 @@ func main() {
 }
 
 func openBrowser(url string) {
-	exec.Command("open", url).Start()
+	qoder.OpenBrowser(url)
 }

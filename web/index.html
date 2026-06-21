@@ -595,7 +595,7 @@
                                 <div class="info">
                                     <div class="name">${backup.name}</div>
                                     <div class="meta">
-                                        🕐 ${formatTime(backup.modTime.getTime())} |
+                                        🕐 ${new Date(backup.modTime).toLocaleString('zh-CN')} |
                                         📦 ${formatSize(backup.size)}
                                     </div>
                                 </div>

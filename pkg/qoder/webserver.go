@@ -2,16 +2,18 @@ package qoder
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // WebServer Web服务器
@@ -53,7 +55,7 @@ func (s *WebServer) Start() error {
 
 	// 自动打开浏览器
 	time.Sleep(500 * time.Millisecond)
-	openBrowser(addr)
+	openBrowser("http://" + addr)
 
 	return http.ListenAndServe(addr, nil)
 }
@@ -236,7 +238,12 @@ func (s *WebServer) handleBackups(w http.ResponseWriter, r *http.Request) {
 	backupDir := getDefaultBackupDir()
 	entries, err := os.ReadDir(backupDir)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		if errors.Is(err, fs.ErrNotExist) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte("[]"))
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -275,13 +282,11 @@ func (s *WebServer) handleBackups(w http.ResponseWriter, r *http.Request) {
 }
 
 func openBrowser(url string) {
-	cmd := "open"
-	exec.Command(cmd, url).Start()
+	OpenBrowser(url)
 }
 
 func getDefaultBackupDir() string {
-	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, "Documents", "qoder-backups")
+	return GetDefaultBackupDir()
 }
 
 // findWebDir 查找web目录
@@ -291,23 +296,25 @@ func (s *WebServer) findWebDir() string {
 		return "web"
 	}
 
-	// 尝试相对于可执行文件的路径（.app包）
+	// 尝试相对于可执行文件的路径
 	execPath, err := os.Executable()
 	if err == nil {
-		// 在.app包中，路径是 .../QoderSessionManager.app/Contents/MacOS/qoder-web
-		// 我们需要 .../QoderSessionManager.app/Contents/Resources/web
-		if filepath.Base(filepath.Dir(filepath.Dir(execPath))) == "Contents" {
-			resourcesDir := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(execPath))), "Resources", "web")
-			if _, err := os.Stat(filepath.Join(resourcesDir, "index.html")); err == nil {
-				return resourcesDir
+		// 通用：相对于可执行文件同级的 web 目录
+		execDir := filepath.Dir(execPath)
+		webDir := filepath.Join(execDir, "web")
+		if _, err := os.Stat(filepath.Join(webDir, "index.html")); err == nil {
+			return webDir
+		}
+
+		// macOS .app 包结构
+		if runtime.GOOS == "darwin" {
+			if filepath.Base(filepath.Dir(filepath.Dir(execPath))) == "Contents" {
+				resourcesDir := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(execPath))), "Resources", "web")
+				if _, err := os.Stat(filepath.Join(resourcesDir, "index.html")); err == nil {
+					return resourcesDir
+				}
 			}
 		}
-	}
-
-	// 尝试源码目录
-	sourceDir := "/Users/lucky/Documents/WorkSapce/QoderSM/web"
-	if _, err := os.Stat(filepath.Join(sourceDir, "index.html")); err == nil {
-		return sourceDir
 	}
 
 	return ""

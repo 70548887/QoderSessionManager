@@ -48,7 +48,7 @@ func main() {
 		exportWorkspace(manager, os.Args[2])
 	case "list-backups":
 		if len(os.Args) < 3 {
-			listBackups(manager, getDefaultBackupDir())
+			listBackups(manager, qoder.GetDefaultBackupDir())
 		} else {
 			listBackups(manager, os.Args[2])
 		}
@@ -125,7 +125,7 @@ func backupWorkspace(manager *qoder.QoderSessionManager, workspaceID string) {
 		return
 	}
 
-	backupDir := getDefaultBackupDir()
+	backupDir := qoder.GetDefaultBackupDir()
 	timestamp := time.Now().Format("20060102-150405")
 	backupPath := filepath.Join(backupDir, fmt.Sprintf("qoder-backup-%s.json", timestamp))
 
@@ -147,7 +147,7 @@ func backupAll(manager *qoder.QoderSessionManager) {
 		return
 	}
 
-	backupDir := getDefaultBackupDir()
+	backupDir := qoder.GetDefaultBackupDir()
 	timestamp := time.Now().Format("20060102-150405")
 	backupPath := filepath.Join(backupDir, fmt.Sprintf("qoder-backup-all-%s.json", timestamp))
 
@@ -325,7 +325,7 @@ func exportWorkspace(manager *qoder.QoderSessionManager, workspaceID string) {
 	}
 
 	// 导出为可读格式
-	exportDir := getDefaultBackupDir()
+	exportDir := qoder.GetDefaultBackupDir()
 	timestamp := time.Now().Format("20060102-150405")
 	exportPath := filepath.Join(exportDir, fmt.Sprintf("qoder-export-%s.txt", timestamp))
 
@@ -370,7 +370,7 @@ func exportAll(manager *qoder.QoderSessionManager) {
 		return
 	}
 
-	exportDir := getDefaultBackupDir()
+	exportDir := qoder.GetDefaultBackupDir()
 	timestamp := time.Now().Format("20060102-150405")
 	exportPath := filepath.Join(exportDir, fmt.Sprintf("qoder-export-all-%s.txt", timestamp))
 
@@ -431,7 +431,3 @@ func listBackups(manager *qoder.QoderSessionManager, backupDir string) {
 	}
 }
 
-func getDefaultBackupDir() string {
-	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, "Documents", "qoder-backups")
-}
